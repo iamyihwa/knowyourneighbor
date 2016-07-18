@@ -1,0 +1,125 @@
+---
+title: "healthspending"
+output: pdf_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+setwd('/Users/iamyihwa/Documents/datascience/healthdata')
+library(readr)
+#for the household disposable income, it is important to make it gross adjusted
+#otherwise net is some sort of percentage 
+#https://data.oecd.org/hha/household-disposable-income.htm
+#https://data.oecd.org/healthres/health-spending.htm
+healthspending <- read_delim("DP_LIVE_19042016165704637.csv", delim = ',')
+disposableincome <- read_delim("DP_LIVE_25042016151732109.csv", delim = ',')
+#this data was the one used first
+#however it has some net thing, and korea was lower than switzerland
+#DP_LIVE_21042016151424297.csv", delim = ',')
+```
+
+
+Use dplyr to group the data into different groups 
+Get average of last 3 years on private vs public 
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+#Location has a strange character in it, so change the name to something 
+#cleaner 
+colnames(healthspending)[1] <- c("LOCATION")
+colnames(disposableincome)[1] <- c("LOCATION")
+
+
+#Get the last 3 years values to see the trends in the last years 
+healthspending_lastyears <- subset(healthspending , healthspending$TIME > max(healthspending$TIME)-3)
+disposableincome_lastyears <- subset(disposableincome , disposableincome$TIME > max(disposableincome$TIME)-3)
+
+#since health spending 
+hsl_grouped <- group_by(healthspending_lastyears, LOCATION, SUBJECT)
+summary_hsl<-summarise(hsl_grouped,HS =mean(Value))#, sd=sd(Value)
+summary_hsl_ratio <-spread(summary_hsl,  SUBJECT, HS)
+summary_hsl_ratio$RATIO <- summary_hsl_ratio$PRIV/summary_hsl_ratio$PUB
+#Since health spending has values need to group them 
+dil_grouped <- group_by(disposableincome_lastyears, LOCATION)
+summary_dil <- summarise(dil_grouped, DI = mean(Value))
+
+combined_set <- inner_join(summary_hsl_ratio, summary_dil, by = "LOCATION") 
+#Because there was extra column it didn't work so well 
+#but when taking out the sd it worked well!! 
+
+k1 <- subset(combined_set, LOCATION == "KOR")
+
+
+
+ggplot(combined_set, aes(x = DI, y = TOT ,label = LOCATION) ) + geom_point() + ylab('Total Health spending [$/capita]') + xlab('Disposable Income (Gross adjusted) [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE, colour = "black") + ggtitle('Total Health Spending Grows with the Increase of Disposable Income')  + theme(text = element_text(size=18))
+#Make two plots grid with private vs public 
+
+
+g1 <-ggplot(combined_set, aes(x = DI, y = TOT ,label = LOCATION) ) + geom_point() + ylab('Total Health spending [$/capita]') + xlab('Disposable Income (Gross adjusted) [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE, colour = "black") + ggtitle('Total Health Spending Grows with the Increase of Disposable Income')  + theme(text = element_text(size=18))
+#Make two plots grid with private vs public 
+library(plotly)
+(gg<- ggplotly(g1))
+
+
+g2<-ggplot(combined_set, aes(x = PUB, y = PRIV ,label = LOCATION) ) + geom_point() + ylab('Private Health spending [$/capita]') + xlab('Public Health Spending [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE, colour = "black") + ggtitle('Public vs Private Health Spending') + theme(text = element_text(size=18))
+#Make two plots grid with private vs public 
+ ggplot(subset(combined_set, LOCATION != 'USA' ), aes(x = PUB, y = PRIV ,label = LOCATION) ) + geom_point() + ylab('Private Health spending [$/capita]') + xlab('Public Health Spending [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE) + ggtitle('Public vs Private Health Spending (without USA)') + theme(text = element_text(size=18))
+#Make two plots grid with private vs public 
+ggplot(subset(combined_set, LOCATION != 'USA' ), aes(x = TOT, y = PRIV ,label = LOCATION) ) + geom_point() + ylab('Private Health spending [$/capita]') + xlab('Total Health Spending [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE) + ggtitle('Total vs Private Health Spending (without USA)') + theme(text = element_text(size=18))
+#Make two plots grid with private vs public 
+(gg<- ggplotly(g4))
+
+ggplot(combined_set, aes(x = PUB, y = RATIO ,label = LOCATION) ) + geom_point() + ylab('Ratio (private / public)') + xlab('Public Health Spending [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE) + ggtitle(' Public Health Spending vs Ratio') + theme(text = element_text(size=18))
+#Make two plots grid with private vs publi
+
+ggplot(subset(combined_set, LOCATION != 'USA' ), aes(x = PUB, y = RATIO ,label = LOCATION) ) + geom_point() + ylab('Ratio (private / public)') + xlab('Public Health Spending [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, colour="red") + geom_smooth(method=lm,se=FALSE) + ggtitle(' Public Health Spending vs Ratio (without USA)') + theme(text = element_text(size=18))
+#Make two plots grid with private vs public 
+
+ggplot(combined_set, aes(x = DI ,y = RATIO, label = LOCATION) )  + ylab('Ratio (Private/Public Health spending)') + xlab('Disposable Income (Gross adjusted) [$/capita]')+ geom_text(hjust=-.1, vjust=-.1) + geom_point(data=k1, aes(size = TOT), colour="red") + geom_point(aes(x = mean(combined_set$DI), y = mean(combined_set$RATIO), size=mean(combined_set$TOT) ), colour = "blue") + geom_point(data = subset(combined_set, LOCATION != 'KOR'), aes(size = TOT))  +  theme(text = element_text(size=18))+ ggtitle("Disposable income vs Ratio (private/public)") #+ geom_point(x = mean(combined_set$DI), y = mean(combined_set$RATIO), colour = "blue")
+
+#Make a histogram of disposable income with color in private/ public 
+ggplot(combined_set, aes(x=reorder(LOCATION, RATIO), y=RATIO)) + geom_bar(stat="identity") +  geom_bar(data = subset(combined_set, LOCATION == 'KOR'), aes(reorder(LOCATION, RATIO), RATIO), fill="red", stat="identity") +  coord_flip() + ggtitle("Ratio (Private / Public Health Spending)")  + theme(text = element_text(size=15))  + geom_hline(aes(yintercept=mean(combined_set$RATIO)), colour="blue", linetype="dashed") +xlab('Countries')
+
+#ggplot(combined_set, aes(x = DI, y = PUB ,label = LOCATION) ) + geom_point() + ylab('Public Health spending [$/capita]') + xlab('Disposable Income (Gross adjusted) [$/capita]')+ geom_text()+  geom_point(data=k1, colour="red")  + geom_smooth(method=lm,se=FALSE) +ggtitle('Public Health Spending Grows with the Increase of Disposable Income') 
+
+#ggplot(combined_set, aes(x = DI, y = PRIV ,label = LOCATION) ) + geom_point() + ylab('Private Health spending [$/capita]') + xlab('Disposable Income (Gross adjusted) [$/capita]')+ geom_text() + geom_point(data=k1, colour="red") # + geom_smooth(method=lm,se=FALSE) 
+
+
+
+
+combined_set2<- combined_set
+combined_set2$RATIO <-factor(combined_set$LOCATION, levels=combined_set[order(combined_set$RATIO), "DI"])
+ library(gridExtra)
+x <-ggplot(combined_set2, aes(y= LOCATION, x=RATIO)) + 
+    geom_point(stat="identity")
+ 
+y <-ggplot(combined_set2, aes(x=LOCATION, y=RATIO)) + 
+    geom_bar(stat="identity") + 
+    coord_flip()
+ 
+grid.arrange(x, y, ncol=2)
+
+#Do some clustering analysis to show that there are some patterns
+mydata <- combined_set
+mydata$LOCATION <- NULL
+fit <- kmeans(mydata, 2)
+library(cluster) 
+clusplot(mydata, fit$cluster, color=TRUE, shade=TRUE, labels=2, lines=0)
+plot(mydata[c( "DI", "RATIO")], col=fit$cluster)
+
+
+
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
